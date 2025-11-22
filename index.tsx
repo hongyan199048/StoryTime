@@ -238,6 +238,26 @@ const styles = {
     // Flex props moved to CSS
     padding: '16px 24px',
   },
+  actionButton: {
+    borderRadius: '16px',
+    backgroundColor: '#FFF',
+    border: '2px solid #E5E5E5',
+    borderBottom: '6px solid #E5E5E5',
+    color: '#4B4B4B',
+    fontSize: '17px',
+    fontWeight: 700,
+    cursor: 'pointer',
+    textTransform: 'uppercase' as const,
+    letterSpacing: '0.8px',
+    transition: 'all 0.1s',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: '10px',
+    position: 'relative' as const,
+    top: '0px',
+    padding: '16px 24px',
+  },
   dangerButton: {
      padding: '12px 24px',
      borderRadius: '12px',
@@ -470,6 +490,24 @@ const styles = {
     backgroundColor: '#58CC02',
     borderRadius: '12px',
     transition: 'width 0.3s ease',
+  },
+  savedStoryItem: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: '16px',
+    backgroundColor: '#F7F7F7',
+    borderRadius: '16px',
+    border: '2px solid #E5E5E5',
+    borderBottom: '4px solid #E5E5E5',
+    marginBottom: '12px',
+    cursor: 'pointer',
+  },
+  savedStoryInfo: {
+    display: 'flex',
+    flexDirection: 'column' as const,
+    alignItems: 'flex-start',
+    gap: '4px',
   }
 };
 
@@ -544,9 +582,10 @@ const globalStyles = `
   }
 
   /* Button Active States for 3D click effect */
-  button:active:not(:disabled) {
+  button:active:not(:disabled), .story-card:active {
     transform: translateY(6px) !important;
     box-shadow: none !important;
+    border-bottom-width: 2px !important;
   }
 
   /* Focus states for inputs */
@@ -610,22 +649,16 @@ const globalStyles = `
         gap: 20px !important;
     }
     
-    /* Controls Grid Layout for Mobile */
+    /* Controls Grid Layout for Mobile - Changed to Column for better readability */
     .controls-section {
-        display: grid !important;
-        grid-template-columns: 1fr 1fr; /* Two columns */
-        gap: 12px !important;
-        flex-direction: unset !important; /* Override flex column */
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 16px !important;
     }
 
     .control-group {
-        width: auto !important;
+        width: 100% !important;
         min-width: 0 !important;
-    }
-
-    /* Make the last control (Quality) span full width if it's the 3rd item */
-    .control-group:nth-child(3) {
-        grid-column: 1 / -1;
     }
 
     /* Input/Select Compaction */
@@ -722,10 +755,35 @@ interface Config {
 interface Option {
   value: string;
   label: string;
-  icon?: string;
+  icon?: React.ReactNode;
+}
+
+interface SavedStory {
+  id: string;
+  timestamp: number;
+  title: string;
+  script: string;
+  scenes: Scene[];
+  config: Config;
 }
 
 // --- Components ---
+
+// Shape Preview Component
+const ShapePreview = ({ ratio }: { ratio: string }) => {
+  const styles: React.CSSProperties = {
+    display: 'inline-block',
+    border: '2px solid currentColor',
+    borderRadius: '2px',
+    boxSizing: 'border-box',
+  };
+  
+  if (ratio === '16:9') return <div style={{...styles, width: '20px', height: '11px'}} />;
+  if (ratio === '4:3') return <div style={{...styles, width: '18px', height: '13.5px'}} />;
+  if (ratio === '1:1') return <div style={{...styles, width: '16px', height: '16px'}} />;
+  if (ratio === '9:16') return <div style={{...styles, width: '11px', height: '20px'}} />;
+  return null;
+};
 
 // Custom Select Component
 const CustomSelect = ({ value, onChange, options }: { value: string, onChange: (val: string) => void, options: Option[] }) => {
@@ -808,6 +866,7 @@ function App() {
   const [hasKey, setHasKey] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [showProfile, setShowProfile] = useState(false);
+  const [showLoadModal, setShowLoadModal] = useState(false);
   const [videoProgress, setVideoProgress] = useState<{current: number, total: number} | null>(null);
   const [usageCount, setUsageCount] = useState(0);
   const [config, setConfig] = useState<Config>({
@@ -856,8 +915,9 @@ function App() {
 
   const clearData = () => {
     localStorage.removeItem('storyGenUsage');
+    localStorage.removeItem('savedStories');
     setUsageCount(0);
-    alert("History cleared!");
+    alert("History and saved stories cleared!");
   };
 
   const saveCustomSettings = () => {
@@ -867,13 +927,59 @@ function App() {
     alert("Settings saved! You are now using your custom API configuration.");
   };
 
+  // --- Save / Load Logic ---
+  const handleSaveStory = () => {
+    if (!script.trim() && scenes.length === 0) {
+        alert("Nothing to save yet!");
+        return;
+    }
+    
+    const title = script.slice(0, 25).trim() + (script.length > 25 ? '...' : '') || 'Untitled Story';
+    const newStory: SavedStory = {
+      id: Date.now().toString(),
+      timestamp: Date.now(),
+      title,
+      script,
+      scenes,
+      config
+    };
+
+    try {
+        const existing = JSON.parse(localStorage.getItem('savedStories') || '[]');
+        const updated = [newStory, ...existing];
+        localStorage.setItem('savedStories', JSON.stringify(updated));
+        alert('Story Saved Successfully! 💾');
+    } catch (e) {
+        console.error("Save failed", e);
+        alert("Failed to save story. Local storage might be full.");
+    }
+  };
+
+  const handleLoadStory = (story: SavedStory) => {
+      setScript(story.script);
+      setScenes(story.scenes);
+      setConfig(story.config);
+      setShowLoadModal(false);
+  };
+
+  const handleDeleteStory = (e: React.MouseEvent, id: string) => {
+      e.stopPropagation();
+      if (!confirm("Are you sure you want to delete this story?")) return;
+      
+      const existing: SavedStory[] = JSON.parse(localStorage.getItem('savedStories') || '[]');
+      const updated = existing.filter(s => s.id !== id);
+      localStorage.setItem('savedStories', JSON.stringify(updated));
+      // Force re-render of modal content by closing/opening or just let React handle it if we were fetching from state. 
+      // Since we read from LS in render, we need to force update or use state for the list.
+      // Let's use a simple wrapper in the modal to read LS.
+      // Actually, better to put savedStories in state for the modal.
+  };
+
   // Logic for generation permissions
-  // If customApiKey is present, they are "PRO"
   const isCustomPro = !!customApiKey;
   const remainingFree = Math.max(0, FREE_LIMIT - usageCount);
   const canGenerateUser = hasKey || isCustomPro || remainingFree > 0;
 
-  // Calculate Level based on usage
   const level = Math.floor(usageCount / 3) + 1;
   const roleName = (hasKey || isCustomPro) ? "Magic Director" : "Junior Storyteller";
 
@@ -896,7 +1002,6 @@ function App() {
     setIsAnalyzing(true);
     setScenes([]);
 
-    // Only increment usage if not pro/custom
     if (!hasKey && !isCustomPro) {
         const newCount = usageCount + 1;
         setUsageCount(newCount);
@@ -944,10 +1049,15 @@ function App() {
       setIsAnalyzing(false);
       processSceneGeneration(initialScenes);
 
-    } catch (error) {
+    } catch (error: any) {
       console.error("Analysis error", error);
       setIsAnalyzing(false);
-      alert("Something went wrong! If you are using a custom key, check your settings.");
+      if (error.message?.includes('403') || error.toString().includes('permission') || error.status === 'PERMISSION_DENIED') {
+         alert("Access denied. Please ensure you have selected a valid API key with access to Gemini 3 models.");
+         handleSelectKey();
+      } else {
+         alert("Something went wrong! If you are using a custom key, check your settings.");
+      }
     }
   };
 
@@ -987,9 +1097,17 @@ function App() {
            workingScenes[i] = { ...scene, status: 'error' };
         }
 
-      } catch (err) {
+      } catch (err: any) {
         console.error(`Error generating scene ${scene.sceneNumber}`, err);
         workingScenes[i] = { ...scene, status: 'error' };
+        
+        if (err.message?.includes('403') || err.toString().includes('permission') || err.status === 'PERMISSION_DENIED') {
+             alert("Generation stopped: Access denied. Please check your API key.");
+             // Stop further generation to prevent spamming errors
+             setScenes([...workingScenes]); 
+             handleSelectKey();
+             return;
+        }
       }
       setScenes([...workingScenes]);
     }
@@ -1018,14 +1136,12 @@ function App() {
     recorder.start();
     setVideoProgress({ current: 0, total: completedScenes.length });
 
-    // Draw text helper
     const drawText = (text: string) => {
       const fontSize = Math.floor(height * 0.05); 
       ctx.font = `700 ${fontSize}px "Quicksand", "Nunito", sans-serif`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'bottom';
       
-      // Gradient Background
       const gradient = ctx.createLinearGradient(0, height - (height * 0.35), 0, height);
       gradient.addColorStop(0, 'rgba(0,0,0,0)');
       gradient.addColorStop(0.3, 'rgba(0,0,0,0.7)');
@@ -1062,7 +1178,6 @@ function App() {
       for (let i = 0; i < lines.length; i++) {
         ctx.fillText(lines[i], width / 2, y + (i * lineHeight));
       }
-      // Reset shadow
       ctx.shadowColor = 'transparent';
     };
 
@@ -1119,24 +1234,17 @@ function App() {
         </div>
         
         <div style={styles.headerRight}>
-          {/* Gamified usage counter */}
           <div style={styles.gemCounter} className="gem-counter">
             {(hasKey || isCustomPro) ? (
-               <>
-                <span>💎</span>
-                <span>Unlimited</span>
-               </>
+               <><span>💎</span><span>Unlimited</span></>
             ) : (
                <>
                 <span>⚡</span>
-                <span style={remainingFree === 0 ? {color: '#E5E5E5'} : {}}>
-                   {remainingFree}
-                </span>
+                <span style={remainingFree === 0 ? {color: '#E5E5E5'} : {}}>{remainingFree}</span>
                </>
             )}
           </div>
           
-          {/* Profile Avatar */}
           <div 
              style={styles.avatarBtn} 
              className="avatar-btn" 
@@ -1149,7 +1257,6 @@ function App() {
 
       <main style={styles.main} className="main-content">
         <section style={styles.inputSection}>
-          {/* Top controls */}
           <div style={styles.controlsRow} className="controls-section">
              <div style={styles.controlGroup} className="control-group">
                <label style={styles.label} className="label">Art Style</label>
@@ -1171,10 +1278,10 @@ function App() {
                  value={config.aspectRatio}
                  onChange={(val) => setConfig({...config, aspectRatio: val})}
                  options={[
-                   { value: "16:9", label: "Landscape", icon: "🖥️" },
-                   { value: "4:3", label: "TV", icon: "📺" },
-                   { value: "1:1", label: "Square", icon: "⏹️" },
-                   { value: "9:16", label: "Portrait", icon: "📱" }
+                   { value: "16:9", label: "Landscape", icon: <ShapePreview ratio="16:9" /> },
+                   { value: "4:3", label: "TV", icon: <ShapePreview ratio="4:3" /> },
+                   { value: "1:1", label: "Square", icon: <ShapePreview ratio="1:1" /> },
+                   { value: "9:16", label: "Portrait", icon: <ShapePreview ratio="9:16" /> }
                  ]}
                />
              </div>
@@ -1192,7 +1299,6 @@ function App() {
              </div>
           </div>
 
-          {/* Text Input */}
           <textarea 
             style={styles.textarea}
             placeholder="Once upon a time..."
@@ -1200,8 +1306,26 @@ function App() {
             onChange={(e) => setScript(e.target.value)}
           />
           
-          {/* Buttons */}
           <div style={styles.buttonGroup} className="button-group">
+            {/* Save/Load Buttons */}
+            <button 
+                style={styles.actionButton} 
+                className="action-btn"
+                onClick={handleSaveStory}
+                title="Save current story"
+            >
+                💾 SAVE
+            </button>
+            
+            <button 
+                style={styles.actionButton} 
+                className="action-btn"
+                onClick={() => setShowLoadModal(true)}
+                title="Load saved story"
+            >
+                📂 LOAD
+            </button>
+
             {canGenerateUser ? (
                 <button 
                   style={{
@@ -1238,7 +1362,6 @@ function App() {
           </div>
         </section>
 
-        {/* Scenes Grid */}
         <div style={styles.grid} className="story-grid">
           {scenes.map((scene) => (
             <div 
@@ -1284,6 +1407,42 @@ function App() {
           <img src={selectedImage} style={styles.modalImage} alt="Full view" onClick={(e) => e.stopPropagation()} />
         </div>
       )}
+
+      {/* Load Story Modal */}
+      {showLoadModal && (
+        <div style={styles.modal} onClick={() => setShowLoadModal(false)}>
+            <div style={{...styles.profileCard, maxHeight: '70vh'}} className="profile-card" onClick={e => e.stopPropagation()}>
+                <button style={{...styles.closeButton, top: '-20px', right: '-20px'}} onClick={() => setShowLoadModal(false)}>&times;</button>
+                <h2 style={{...styles.profileName, marginBottom: '24px'}}>Saved Stories</h2>
+                
+                <div style={{display: 'flex', flexDirection: 'column', gap: '10px', overflowY: 'auto', maxHeight: '400px'}}>
+                    {(JSON.parse(localStorage.getItem('savedStories') || '[]') as SavedStory[]).length === 0 ? (
+                        <p style={{color: '#AFAFAF', fontWeight: 700}}>No stories saved yet.</p>
+                    ) : (
+                        (JSON.parse(localStorage.getItem('savedStories') || '[]') as SavedStory[]).map((s) => (
+                            <div key={s.id} style={styles.savedStoryItem} onClick={() => handleLoadStory(s)}>
+                                <div style={styles.savedStoryInfo}>
+                                    <span style={{fontWeight: 700, color: '#4B4B4B', textAlign: 'left'}}>{s.title}</span>
+                                    <span style={{fontSize: '12px', color: '#AFAFAF'}}>{new Date(s.timestamp).toLocaleDateString()}</span>
+                                </div>
+                                <button 
+                                    style={{
+                                        ...styles.dangerButton, 
+                                        margin: 0, 
+                                        padding: '8px 12px', 
+                                        fontSize: '12px'
+                                    }}
+                                    onClick={(e) => handleDeleteStory(e, s.id)}
+                                >
+                                    🗑️
+                                </button>
+                            </div>
+                        ))
+                    )}
+                </div>
+            </div>
+        </div>
+      )}
       
       {/* Profile View Modal */}
       {showProfile && (
@@ -1314,7 +1473,6 @@ function App() {
             </div>
             
             <div style={{display: 'flex', flexDirection: 'column', gap: '12px'}}>
-               {/* Default Login Action */}
                {!isCustomPro && (
                    hasKey ? (
                       <button style={styles.secondaryButton} onClick={handleSelectKey}>
