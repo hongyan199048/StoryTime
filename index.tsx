@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { createRoot } from 'react-dom/client';
 import { GoogleGenAI, Type } from "@google/genai";
@@ -587,36 +586,66 @@ const globalStyles = `
   /* --- MOBILE RESPONSIVE OVERRIDES --- */
   @media (max-width: 768px) {
     .app-header {
-        padding: 12px 16px !important;
+        padding: 10px 16px !important;
+        position: sticky;
+        top: 0;
+        z-index: 100;
     }
     .header-title {
         font-size: 20px !important;
     }
     .gem-counter {
-        padding: 6px 12px !important;
-        font-size: 14px !important;
+        padding: 6px 10px !important;
+        font-size: 13px !important;
     }
     .avatar-btn {
-        width: 40px !important;
-        height: 40px !important;
+        width: 36px !important;
+        height: 36px !important;
         font-size: 20px !important;
+        border-bottom-width: 2px !important;
     }
     
     .main-content {
-        padding: 20px 16px !important;
-        gap: 24px !important;
+        padding: 16px 16px !important;
+        gap: 20px !important;
     }
     
+    /* Controls Grid Layout for Mobile */
     .controls-section {
-        flex-direction: column;
-        gap: 12px;
+        display: grid !important;
+        grid-template-columns: 1fr 1fr; /* Two columns */
+        gap: 12px !important;
+        flex-direction: unset !important; /* Override flex column */
     }
-    
+
     .control-group {
-        width: 100%;
+        width: auto !important;
         min-width: 0 !important;
     }
+
+    /* Make the last control (Quality) span full width if it's the 3rd item */
+    .control-group:nth-child(3) {
+        grid-column: 1 / -1;
+    }
+
+    /* Input/Select Compaction */
+    .custom-select-trigger, .input-field, textarea {
+        padding: 12px 14px !important;
+        font-size: 15px !important;
+        border-radius: 12px !important;
+        border-bottom-width: 4px !important;
+    }
     
+    textarea {
+        min-height: 120px !important;
+    }
+
+    .label {
+        font-size: 12px !important;
+        margin-bottom: 4px !important;
+    }
+
+    /* Buttons */
     .button-group {
         flex-direction: column;
         gap: 12px;
@@ -624,24 +653,45 @@ const globalStyles = `
     
     .action-btn, .action-btn-primary {
         width: 100% !important;
+        padding: 16px !important;
         min-width: 0 !important;
         flex: unset !important;
+        font-size: 16px !important;
+        border-radius: 12px !important;
+        /* Adjust shadows for smaller screens to feel less bulky */
+        box-shadow: 0px 4px 0px rgba(0,0,0,0.2) !important; 
     }
-    
+
+    /* Grid Cards */
     .story-grid {
-        grid-template-columns: 1fr !important; /* Full width cards */
+        grid-template-columns: 1fr !important;
         gap: 20px !important;
     }
     
-    /* Make profile modal fit better */
+    .story-card {
+        border-radius: 16px !important;
+        border-bottom-width: 4px !important;
+    }
+    
+    .card-content {
+        padding: 16px !important;
+    }
+    
+    .caption-text {
+        font-size: 15px !important;
+    }
+
+    /* Modal Mobile */
     .profile-card {
+        width: 95% !important;
         padding: 20px !important;
-        width: 90% !important;
+        max-height: 85vh;
+        overflow-y: auto;
     }
     .profile-avatar-large {
         width: 80px !important;
         height: 80px !important;
-        font-size: 36px !important;
+        font-size: 40px !important;
     }
     .stats-row {
         gap: 10px;
@@ -720,6 +770,7 @@ const CustomSelect = ({ value, onChange, options }: { value: string, onChange: (
              return (
                 <div 
                   key={option.value}
+                  className="dropdown-menu-item"
                   style={{
                     ...styles.dropdownItem,
                     backgroundColor: isSelected ? '#E0F2FE' : 'transparent',
@@ -1101,7 +1152,7 @@ function App() {
           {/* Top controls */}
           <div style={styles.controlsRow} className="controls-section">
              <div style={styles.controlGroup} className="control-group">
-               <label style={styles.label}>Art Style</label>
+               <label style={styles.label} className="label">Art Style</label>
                <CustomSelect 
                  value={config.style}
                  onChange={(val) => setConfig({...config, style: val})}
@@ -1115,7 +1166,7 @@ function App() {
                />
              </div>
              <div style={styles.controlGroup} className="control-group">
-               <label style={styles.label}>Shape</label>
+               <label style={styles.label} className="label">Shape</label>
                <CustomSelect 
                  value={config.aspectRatio}
                  onChange={(val) => setConfig({...config, aspectRatio: val})}
@@ -1128,7 +1179,7 @@ function App() {
                />
              </div>
              <div style={styles.controlGroup} className="control-group">
-               <label style={styles.label}>Quality</label>
+               <label style={styles.label} className="label">Quality</label>
                <CustomSelect 
                  value={config.imageSize}
                  onChange={(val) => setConfig({...config, imageSize: val as any})}
@@ -1282,19 +1333,21 @@ function App() {
 
                {showDevSettings && (
                    <div style={styles.devSettings}>
-                      <label style={styles.label}>Custom API Key</label>
+                      <label style={styles.label} className="label">Custom API Key</label>
                       <input 
                          type="password" 
                          style={styles.input} 
+                         className="input-field"
                          placeholder="Gemini API Key (sk-...)"
                          value={customApiKey}
                          onChange={e => setCustomApiKey(e.target.value)}
                       />
                       
-                      <label style={styles.label}>Base URL (Optional)</label>
+                      <label style={styles.label} className="label">Base URL (Optional)</label>
                       <input 
                          type="text" 
                          style={styles.input} 
+                         className="input-field"
                          placeholder="https://generativelanguage.googleapis.com"
                          value={customBaseUrl}
                          onChange={e => setCustomBaseUrl(e.target.value)}
